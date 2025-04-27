@@ -1,0 +1,19 @@
+{
+  "name": "trading-alerts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "push": "npx clasp push",
+    "pull": "npx clasp pull",
+    "open": "npx clasp open",
+    "deploy": "npx clasp deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google/clasp": "^3.0.3-alpha"
+  }
+}
