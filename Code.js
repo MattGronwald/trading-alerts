@@ -5,88 +5,138 @@ function checkAlarm() {
     var sheet = spreadsheet.getSheetByName(sheetName);
 
     SpreadsheetApp.flush();
-    
+
     var data = sheet.getDataRange().getValues();
-    var fallingTickers = [];
-    var risingTickers = [];
+    var goldenCrossTickers = [];
+    var deathCrossTickers = [];
     var now = new Date();
 
     // First update previous states
     for (var i = 1; i < data.length; i++) {
-      var currentAlarm = data[i][4]; 
-      sheet.getRange(i + 1, 6).setValue(currentAlarm);
+      var currentSignal = data[i][5]; // Cross Signal column (index 5)
+      sheet.getRange(i + 1, 7).setValue(currentSignal); // Previous Signal column (index 6)
     }
 
-    // Then check for changes and send notifications
+    // Then check for crosses and send notifications
     for (var i = 1; i < data.length; i++) {
-      var symbol = data[i][0];     
-      var name = data[i][1];       
-      var alarm = data[i][4];      
-      var prevStatus = data[i][5]; 
+      var symbol = data[i][0];
+      var name = data[i][1];
+      var sma50 = data[i][3]; // 50 SMA column (index 3)
+      var sma200 = data[i][4]; // 200 SMA column (index 4)
+      var currentSignal = "";
 
-      if (alarm == "JA" && prevStatus != "JA") {
-        fallingTickers.push({symbol: symbol, name: name});
-        sheet.getRange(i + 1, 7).setValue(now);
+      // Determine current cross signal
+      if (sma50 > sma200) {
+        currentSignal = "GOLDEN";
+      } else if (sma50 < sma200) {
+        currentSignal = "DEATH";
       }
-      if (alarm != "JA" && prevStatus == "JA") {
-        risingTickers.push({symbol: symbol, name: name});
-        sheet.getRange(i + 1, 7).setValue(now);
+
+      var prevSignal = data[i][6]; // Previous Signal column (index 6)
+
+      // Update the current signal in the sheet
+      sheet.getRange(i + 1, 6).setValue(currentSignal);
+
+      // Check for Golden Cross (50 SMA crosses above 200 SMA)
+      if (currentSignal == "GOLDEN" && prevSignal == "DEATH") {
+        goldenCrossTickers.push({
+          symbol: symbol,
+          name: name,
+          sma50: sma50,
+          sma200: sma200,
+        });
+        sheet.getRange(i + 1, 8).setValue(now); // Update timestamp
+      }
+
+      // Check for Death Cross (50 SMA crosses below 200 SMA)
+      if (currentSignal == "DEATH" && prevSignal == "GOLDEN") {
+        deathCrossTickers.push({
+          symbol: symbol,
+          name: name,
+          sma50: sma50,
+          sma200: sma200,
+        });
+        sheet.getRange(i + 1, 8).setValue(now); // Update timestamp
       }
     }
 
     // Send email if there are any changes
-    if (fallingTickers.length > 0 || risingTickers.length > 0) {
-      var htmlBody = "<!DOCTYPE html><html><body style=\"font-family: Arial, sans-serif;\">";
-      htmlBody += "<h2>200-Tage-Linie Update vom " + now.toLocaleDateString('de-DE') + "</h2>";
-      
-      if (fallingTickers.length > 0) {
-        htmlBody += "<h3>⬇️ <font color=\"red\"><b>VERKAUFSSIGNALE</b></font> ";
-        htmlBody += "(unter 200-Tage-Linie gefallen):</h3>";
-        
-        htmlBody += "<table border=\"0\" cellpadding=\"5\">";
-        htmlBody += "<tr><th align=\"left\">Symbol</th><th align=\"left\">Name</th></tr>";
-        
-        for (var i = 0; i < fallingTickers.length; i++) {
+    if (goldenCrossTickers.length > 0 || deathCrossTickers.length > 0) {
+      var htmlBody =
+        '<!DOCTYPE html><html><body style="font-family: Arial, sans-serif;">';
+      htmlBody +=
+        "<h2>SMA Cross Signals for " +
+        now.toLocaleDateString("en-US") +
+        "</h2>";
+
+      if (goldenCrossTickers.length > 0) {
+        htmlBody +=
+          '<h3>⬆️ <font color="green"><b>GOLDEN CROSS (BUY SIGNALS)</b></font> ';
+        htmlBody += "(50-day SMA crossed above 200-day SMA):</h3>";
+
+        htmlBody += '<table border="0" cellpadding="5">';
+        htmlBody +=
+          '<tr><th align="left">Symbol</th><th align="left">Name</th><th align="right">50 SMA</th><th align="right">200 SMA</th></tr>';
+
+        for (var i = 0; i < goldenCrossTickers.length; i++) {
           htmlBody += "<tr>";
-          htmlBody += "<td><b>" + fallingTickers[i].symbol + "</b></td>";
-          htmlBody += "<td>" + fallingTickers[i].name + "</td>";
+          htmlBody += "<td><b>" + goldenCrossTickers[i].symbol + "</b></td>";
+          htmlBody += "<td>" + goldenCrossTickers[i].name + "</td>";
+          htmlBody +=
+            '<td align="right">' +
+            goldenCrossTickers[i].sma50.toFixed(2) +
+            "</td>";
+          htmlBody +=
+            '<td align="right">' +
+            goldenCrossTickers[i].sma200.toFixed(2) +
+            "</td>";
           htmlBody += "</tr>";
         }
-        
+
         htmlBody += "</table><br>";
       }
-      
-      if (risingTickers.length > 0) {
-        htmlBody += "<h3>⬆️ <font color=\"green\"><b>KAUFSIGNALE</b></font> ";
-        htmlBody += "(über 200-Tage-Linie gestiegen):</h3>";
-        
-        htmlBody += "<table border=\"0\" cellpadding=\"5\">";
-        htmlBody += "<tr><th align=\"left\">Symbol</th><th align=\"left\">Name</th></tr>";
-        
-        for (var i = 0; i < risingTickers.length; i++) {
+
+      if (deathCrossTickers.length > 0) {
+        htmlBody +=
+          '<h3>⬇️ <font color="red"><b>DEATH CROSS (SELL SIGNALS)</b></font> ';
+        htmlBody += "(50-day SMA crossed below 200-day SMA):</h3>";
+
+        htmlBody += '<table border="0" cellpadding="5">';
+        htmlBody +=
+          '<tr><th align="left">Symbol</th><th align="left">Name</th><th align="right">50 SMA</th><th align="right">200 SMA</th></tr>';
+
+        for (var i = 0; i < deathCrossTickers.length; i++) {
           htmlBody += "<tr>";
-          htmlBody += "<td><b>" + risingTickers[i].symbol + "</b></td>";
-          htmlBody += "<td>" + risingTickers[i].name + "</td>";
+          htmlBody += "<td><b>" + deathCrossTickers[i].symbol + "</b></td>";
+          htmlBody += "<td>" + deathCrossTickers[i].name + "</td>";
+          htmlBody +=
+            '<td align="right">' +
+            deathCrossTickers[i].sma50.toFixed(2) +
+            "</td>";
+          htmlBody +=
+            '<td align="right">' +
+            deathCrossTickers[i].sma200.toFixed(2) +
+            "</td>";
           htmlBody += "</tr>";
         }
-        
+
         htmlBody += "</table>";
       }
-      
-      htmlBody += "<p><i>Dies ist eine automatisierte Nachricht.</i></p>";
+
+      htmlBody += "<p><i>This is an automated message.</i></p>";
       htmlBody += "</body></html>";
-      
+
       MailApp.sendEmail({
         to: "matthias.gronwald@gmail.com",
-        subject: "200-Tage-Linie Signale",
-        htmlBody: htmlBody
+        subject: "Golden Cross & Death Cross Signals",
+        htmlBody: htmlBody,
       });
     }
   } catch (error) {
     MailApp.sendEmail({
       to: "matthias.gronwald@gmail.com",
-      subject: "Fehler im 200-Tage-Linie Script",
-      body: "Es ist ein Fehler aufgetreten: " + error.toString()
+      subject: "Error in SMA Cross Signals Script",
+      body: "An error occurred: " + error.toString(),
     });
     Logger.log(error);
   }
@@ -110,7 +160,7 @@ function updateRegime() {
   const regimeCells = {
     A: sheet.getRange("H2"),
     B: sheet.getRange("H3"),
-    C: sheet.getRange("H4")
+    C: sheet.getRange("H4"),
   };
 
   const triggerDateCell = sheet.getRange("K1"); // Datum des Regimewechsels
@@ -127,7 +177,13 @@ function updateRegime() {
 
   // Variable für das neue Regime
   let newRegime = "";
-  let oldRegime = currentRegimeA ? "A" : currentRegimeB ? "B" : currentRegimeC ? "C" : "Unbekannt";
+  let oldRegime = currentRegimeA
+    ? "A"
+    : currentRegimeB
+      ? "B"
+      : currentRegimeC
+        ? "C"
+        : "Unbekannt";
 
   // Logik für Regimewechsel
   if (currentCloseCell <= threshold40) {
@@ -138,7 +194,10 @@ function updateRegime() {
       regimeCells.C.setValue("Ja");
       newRegime = "C - Eskalation der Eigenkapitalknappheit (Krise)";
     }
-  } else if (currentCloseCell > threshold40 && currentCloseCell <= threshold20) {
+  } else if (
+    currentCloseCell > threshold40 &&
+    currentCloseCell <= threshold20
+  ) {
     // Wechsel zu Regime B
     if (!currentRegimeB) {
       regimeCells.A.setValue("");
@@ -171,12 +230,12 @@ function sendEmailNotification(newRegime, oldRegime, currentClose, maxValue) {
   const subject = `S&P500 Regimewechsel: Von Regime ${oldRegime} zu ${newRegime}`;
   const body = `
     Es gab einen Regimewechsel im System.
-    
+
     Alter Regimezustand: ${oldRegime}
     Neuer Regimezustand: ${newRegime}
     Aktueller Kurs: ${currentClose.toFixed(2)}
     3-Jahres-Hoch: ${maxValue.toFixed(2)}
-    
+
     Beste Grüße,
     Dein Google Sheets System
   `;
