@@ -21,6 +21,7 @@ function checkAlarm() {
     for (var i = 1; i < data.length; i++) {
       var symbol = data[i][0];
       var name = data[i][1];
+      var currentPrice = data[i][2]; // Current price column (index 2)
       var sma50 = data[i][3]; // 50 SMA column (index 3)
       var sma200 = data[i][4]; // 200 SMA column (index 4)
       var currentSignal = "";
@@ -42,8 +43,11 @@ function checkAlarm() {
         goldenCrossTickers.push({
           symbol: symbol,
           name: name,
+          price: currentPrice,
           sma50: sma50,
           sma200: sma200,
+          pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
+          pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
         });
         sheet.getRange(i + 1, 8).setValue(now); // Update timestamp
       }
@@ -53,8 +57,11 @@ function checkAlarm() {
         deathCrossTickers.push({
           symbol: symbol,
           name: name,
+          price: currentPrice,
           sma50: sma50,
           sma200: sma200,
+          pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
+          pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
         });
         sheet.getRange(i + 1, 8).setValue(now); // Update timestamp
       }
@@ -74,14 +81,29 @@ function checkAlarm() {
           '<h3>⬆️ <font color="green"><b>GOLDEN CROSS (BUY SIGNALS)</b></font> ';
         htmlBody += "(50-day SMA crossed above 200-day SMA):</h3>";
 
-        htmlBody += '<table border="0" cellpadding="5">';
         htmlBody +=
-          '<tr><th align="left">Symbol</th><th align="left">Name</th><th align="right">50 SMA</th><th align="right">200 SMA</th></tr>';
+          '<table border="0" cellpadding="5" style="border-collapse: collapse;">';
+        htmlBody += '<tr style="background-color: #f2f2f2;">';
+        htmlBody += '<th align="left">Symbol</th>';
+        htmlBody += '<th align="left">Name</th>';
+        htmlBody += '<th align="right">Current Price</th>';
+        htmlBody += '<th align="right">50 SMA</th>';
+        htmlBody += '<th align="right">200 SMA</th>';
+        htmlBody += '<th align="right">% Above 50</th>';
+        htmlBody += '<th align="right">% Above 200</th>';
+        htmlBody += "</tr>";
 
         for (var i = 0; i < goldenCrossTickers.length; i++) {
-          htmlBody += "<tr>";
+          htmlBody +=
+            "<tr" +
+            (i % 2 == 1 ? ' style="background-color: #f9f9f9;"' : "") +
+            ">";
           htmlBody += "<td><b>" + goldenCrossTickers[i].symbol + "</b></td>";
           htmlBody += "<td>" + goldenCrossTickers[i].name + "</td>";
+          htmlBody +=
+            '<td align="right"><b>' +
+            goldenCrossTickers[i].price.toFixed(2) +
+            "</b></td>";
           htmlBody +=
             '<td align="right">' +
             goldenCrossTickers[i].sma50.toFixed(2) +
@@ -90,6 +112,10 @@ function checkAlarm() {
             '<td align="right">' +
             goldenCrossTickers[i].sma200.toFixed(2) +
             "</td>";
+          htmlBody +=
+            '<td align="right">' + goldenCrossTickers[i].pctAbove50 + "%</td>";
+          htmlBody +=
+            '<td align="right">' + goldenCrossTickers[i].pctAbove200 + "%</td>";
           htmlBody += "</tr>";
         }
 
@@ -101,14 +127,29 @@ function checkAlarm() {
           '<h3>⬇️ <font color="red"><b>DEATH CROSS (SELL SIGNALS)</b></font> ';
         htmlBody += "(50-day SMA crossed below 200-day SMA):</h3>";
 
-        htmlBody += '<table border="0" cellpadding="5">';
         htmlBody +=
-          '<tr><th align="left">Symbol</th><th align="left">Name</th><th align="right">50 SMA</th><th align="right">200 SMA</th></tr>';
+          '<table border="0" cellpadding="5" style="border-collapse: collapse;">';
+        htmlBody += '<tr style="background-color: #f2f2f2;">';
+        htmlBody += '<th align="left">Symbol</th>';
+        htmlBody += '<th align="left">Name</th>';
+        htmlBody += '<th align="right">Current Price</th>';
+        htmlBody += '<th align="right">50 SMA</th>';
+        htmlBody += '<th align="right">200 SMA</th>';
+        htmlBody += '<th align="right">% Above 50</th>';
+        htmlBody += '<th align="right">% Above 200</th>';
+        htmlBody += "</tr>";
 
         for (var i = 0; i < deathCrossTickers.length; i++) {
-          htmlBody += "<tr>";
+          htmlBody +=
+            "<tr" +
+            (i % 2 == 1 ? ' style="background-color: #f9f9f9;"' : "") +
+            ">";
           htmlBody += "<td><b>" + deathCrossTickers[i].symbol + "</b></td>";
           htmlBody += "<td>" + deathCrossTickers[i].name + "</td>";
+          htmlBody +=
+            '<td align="right"><b>' +
+            deathCrossTickers[i].price.toFixed(2) +
+            "</b></td>";
           htmlBody +=
             '<td align="right">' +
             deathCrossTickers[i].sma50.toFixed(2) +
@@ -117,6 +158,10 @@ function checkAlarm() {
             '<td align="right">' +
             deathCrossTickers[i].sma200.toFixed(2) +
             "</td>";
+          htmlBody +=
+            '<td align="right">' + deathCrossTickers[i].pctAbove50 + "%</td>";
+          htmlBody +=
+            '<td align="right">' + deathCrossTickers[i].pctAbove200 + "%</td>";
           htmlBody += "</tr>";
         }
 
