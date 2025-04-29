@@ -35,6 +35,7 @@ function checkForSignals() {
       var sma50 = row[3];
       var sma200 = row[4];
       var prevSignal = row[6]; // Previous Signal (column 7)
+      var currency = row[8]; // Currency (column I)
 
       // Calculate new signal based on current SMA values
       var newSignal = sma50 > sma200 ? "GOLDEN" : "DEATH";
@@ -53,7 +54,9 @@ function checkForSignals() {
             ", 50 SMA=" +
             sma50 +
             ", 200 SMA=" +
-            sma200,
+            sma200 +
+            ", Currency=" +
+            currency,
         );
       }
 
@@ -67,6 +70,7 @@ function checkForSignals() {
           sma200: sma200,
           pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
           pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
+          currency: currency || "", // Include currency, default to empty string if not available
         });
         row[7] = now; // Update timestamp for display in email
         if (DEBUG_MODE) Logger.log("→ GOLDEN CROSS detected for " + symbol);
@@ -81,6 +85,7 @@ function checkForSignals() {
           sma200: sma200,
           pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
           pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
+          currency: currency || "", // Include currency, default to empty string if not available
         });
         row[7] = now; // Update timestamp for display in email
         if (DEBUG_MODE) Logger.log("→ DEATH CROSS detected for " + symbol);
@@ -119,7 +124,7 @@ function checkForSignals() {
       sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, {
         date: now,
         debug: DEBUG_MODE,
-        executionTime: new Date().getTime() - startTime
+        executionTime: new Date().getTime() - startTime,
       });
       Logger.log("Email sent successfully");
     } else {
@@ -146,13 +151,17 @@ function checkForSignals() {
 
 /**
  * Generates and sends an email with cross signal information
- * 
+ *
  * @param {Array} goldenCrossTickers - Array of stocks with golden cross signals
  * @param {Array} deathCrossTickers - Array of stocks with death cross signals
  * @param {Object} options - Additional options like date and debug info
  */
 function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
-  var htmlBody = generateCrossSignalHtml(goldenCrossTickers, deathCrossTickers, options);
+  var htmlBody = generateCrossSignalHtml(
+    goldenCrossTickers,
+    deathCrossTickers,
+    options,
+  );
 
   MailApp.sendEmail({
     to: "matthias.gronwald@gmail.com",
@@ -163,13 +172,17 @@ function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
 
 /**
  * Generates HTML for the cross signal email
- * 
+ *
  * @param {Array} goldenCrossTickers - Array of stocks with golden cross signals
  * @param {Array} deathCrossTickers - Array of stocks with death cross signals
  * @param {Object} options - Additional options like date and debug info
  * @return {string} The formatted HTML content
  */
-function generateCrossSignalHtml(goldenCrossTickers, deathCrossTickers, options) {
+function generateCrossSignalHtml(
+  goldenCrossTickers,
+  deathCrossTickers,
+  options,
+) {
   var now = options.date || new Date();
   var htmlParts = [];
 
@@ -178,25 +191,28 @@ function generateCrossSignalHtml(goldenCrossTickers, deathCrossTickers, options)
     '<!DOCTYPE html><html><body style="font-family: Arial, sans-serif;">',
   );
   htmlParts.push(
-    "<h2>SMA Cross Signals for " +
-      now.toLocaleDateString("en-US") +
-      "</h2>",
+    "<h2>SMA Cross Signals for " + now.toLocaleDateString("en-US") + "</h2>",
   );
 
   // Build Golden Cross table
   if (goldenCrossTickers.length > 0) {
-    htmlParts.push(generateCrossTable(goldenCrossTickers, {
-      title: '⬆️ <font color="green"><b>GOLDEN CROSS (BUY SIGNALS)</b></font>',
-      subtitle: "(50-day SMA crossed above 200-day SMA):"
-    }));
+    htmlParts.push(
+      generateCrossTable(goldenCrossTickers, {
+        title:
+          '⬆️ <font color="green"><b>GOLDEN CROSS (BUY SIGNALS)</b></font>',
+        subtitle: "(50-day SMA crossed above 200-day SMA):",
+      }),
+    );
   }
 
   // Build Death Cross table
   if (deathCrossTickers.length > 0) {
-    htmlParts.push(generateCrossTable(deathCrossTickers, {
-      title: '⬇️ <font color="red"><b>DEATH CROSS (SELL SIGNALS)</b></font>',
-      subtitle: "(50-day SMA crossed below 200-day SMA):"
-    }));
+    htmlParts.push(
+      generateCrossTable(deathCrossTickers, {
+        title: '⬇️ <font color="red"><b>DEATH CROSS (SELL SIGNALS)</b></font>',
+        subtitle: "(50-day SMA crossed below 200-day SMA):",
+      }),
+    );
   }
 
   htmlParts.push("<p><i>This is an automated message.</i></p>");
@@ -216,7 +232,7 @@ function generateCrossSignalHtml(goldenCrossTickers, deathCrossTickers, options)
 
 /**
  * Generates HTML table for a specific cross type
- * 
+ *
  * @param {Array} tickers - Array of stocks with signals
  * @param {Object} options - Table options including title and subtitle
  * @return {string} The formatted HTML table
@@ -226,12 +242,13 @@ function generateCrossTable(tickers, options) {
 
   // Table header
   htmlParts.push(
-    '<h3>' + options.title + ' ' + options.subtitle + '</h3>',
+    "<h3>" + options.title + " " + options.subtitle + "</h3>",
     '<table border="0" cellpadding="5" style="border-collapse: collapse;">',
     '<tr style="background-color: #f2f2f2;">',
     '<th align="left">Symbol</th>',
     '<th align="left">Name</th>',
     '<th align="right">Current Price</th>',
+    '<th align="center">Currency</th>', // Added currency column
     '<th align="right">50 SMA</th>',
     '<th align="right">200 SMA</th>',
     '<th align="right">% Above 50</th>',
@@ -247,6 +264,7 @@ function generateCrossTable(tickers, options) {
       "<td><b>" + stock.symbol + "</b></td>",
       "<td>" + stock.name + "</td>",
       '<td align="right"><b>' + stock.price.toFixed(2) + "</b></td>",
+      '<td align="center">' + stock.currency + "</td>", // Display currency
       '<td align="right">' + stock.sma50.toFixed(2) + "</td>",
       '<td align="right">' + stock.sma200.toFixed(2) + "</td>",
       '<td align="right">' + stock.pctAbove50 + "%</td>",

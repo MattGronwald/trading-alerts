@@ -17,6 +17,7 @@ The script works with a Google Sheet containing the following structure:
 | Cross Signal   | Cross signal status ("GOLDEN", "DEATH")      | Text          |
 | Previous Signal| Previous cross signal status                 | Text          |
 | Last Change    | Last update date                             | Date/Time     |
+| Currency       | Currency of the stock (e.g., "USD", "EUR")   | Text          |
 
 ## SMA Calculation in the Google Sheet
 
@@ -43,6 +44,8 @@ These formulas:
 - Automated detection of Golden Cross and Death Cross events
 - Email notifications with detailed stock information
 - Current price and percentage calculations relative to moving averages
+- Currency information displayed for each stock in email notifications
+- Organized tables of buy and sell signals with relevant metrics
 
 This repository contains a Google Apps Script project managed locally using `clasp` (Command Line Apps Script Projects) and Node.js.
 
