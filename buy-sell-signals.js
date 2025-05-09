@@ -1,94 +1,78 @@
-// Global logging control
-var DEBUG_MODE = false;
+/**
+ * Configuration parameters
+ */
+const CONFIG = {
+  DEBUG_MODE: false,
+  SHEET_NAME: "Aktienliste",
+  EMAIL_RECIPIENT: "matthias.gronwald@gmail.com"
+};
 
+/**
+ * Main function to check for Golden and Death cross signals
+ * Processes data from spreadsheet and sends email notifications
+ */
 function checkForSignals() {
-  var startTime = new Date().getTime();
+  const startTime = new Date().getTime();
 
   try {
-    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = spreadsheet.getSheetByName("Aktienliste");
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(CONFIG.SHEET_NAME);
     SpreadsheetApp.flush();
 
     // Get all data at once
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var stockData = data.slice(1);
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const stockData = data.slice(1);
 
-    var goldenCrossTickers = [];
-    var deathCrossTickers = [];
-    var now = new Date();
+    const goldenCrossTickers = [];
+    const deathCrossTickers = [];
+    const now = new Date();
 
     // Prepare arrays for batch updates
-    var newSignals = [];
-    var prevSignals = [];
-    var timestamps = [];
+    const newSignals = [];
+    const prevSignals = [];
+    const timestamps = [];
 
     // Conditional log
-    if (DEBUG_MODE) Logger.log("Processing " + stockData.length + " stocks");
+    if (CONFIG.DEBUG_MODE) Logger.log(`Processing ${stockData.length} stocks`);
 
     // Process all data in memory
-    for (var i = 0; i < stockData.length; i++) {
-      var row = stockData[i];
-      var symbol = row[0];
-      var name = row[1];
-      var currentPrice = row[2];
-      var sma50 = row[3];
-      var sma200 = row[4];
-      var prevSignal = row[6]; // Previous Signal (column 7)
-      var currency = row[8]; // Currency (column I)
+    for (let i = 0; i < stockData.length; i++) {
+      const row = stockData[i];
+      const symbol = row[0];
+      const name = row[1];
+      const currentPrice = row[2];
+      const sma50 = row[3];
+      const sma200 = row[4];
+      const prevSignal = row[6]; // Previous Signal (column 7)
+      const currency = row[8]; // Currency (column I)
+      
+      // Skip processing if we have invalid data
+      if (!symbol || !currentPrice || !sma50 || !sma200) {
+        continue;
+      }
 
       // Calculate new signal based on current SMA values
-      var newSignal = sma50 > sma200 ? "GOLDEN" : "DEATH";
+      const newSignal = sma50 > sma200 ? "GOLDEN" : "DEATH";
 
       // Debug logging
-      if (DEBUG_MODE) {
+      if (CONFIG.DEBUG_MODE) {
         Logger.log(
-          "Row " +
-            (i + 2) +
-            ": " +
-            symbol +
-            ", New Signal=" +
-            newSignal +
-            ", Prev Signal=" +
-            prevSignal +
-            ", 50 SMA=" +
-            sma50 +
-            ", 200 SMA=" +
-            sma200 +
-            ", Currency=" +
-            currency,
+          `Row ${i + 2}: ${symbol}, New Signal=${newSignal}, Prev Signal=${prevSignal}, 50 SMA=${sma50}, 200 SMA=${sma200}, Currency=${currency}`
         );
       }
 
       // Check for a Golden Cross (was DEATH, now GOLDEN)
-      if (newSignal == "GOLDEN" && prevSignal == "DEATH") {
-        goldenCrossTickers.push({
-          symbol: symbol,
-          name: name,
-          price: currentPrice,
-          sma50: sma50,
-          sma200: sma200,
-          pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
-          pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
-          currency: currency || "", // Include currency, default to empty string if not available
-        });
+      if (newSignal === "GOLDEN" && prevSignal === "DEATH") {
+        goldenCrossTickers.push(createStockInfo(symbol, name, currentPrice, sma50, sma200, currency));
         row[7] = now; // Update timestamp for display in email
-        if (DEBUG_MODE) Logger.log("→ GOLDEN CROSS detected for " + symbol);
+        if (CONFIG.DEBUG_MODE) Logger.log(`→ GOLDEN CROSS detected for ${symbol}`);
       }
       // Check for a Death Cross (was GOLDEN, now DEATH)
-      else if (newSignal == "DEATH" && prevSignal == "GOLDEN") {
-        deathCrossTickers.push({
-          symbol: symbol,
-          name: name,
-          price: currentPrice,
-          sma50: sma50,
-          sma200: sma200,
-          pctAbove50: ((currentPrice / sma50 - 1) * 100).toFixed(2),
-          pctAbove200: ((currentPrice / sma200 - 1) * 100).toFixed(2),
-          currency: currency || "", // Include currency, default to empty string if not available
-        });
+      else if (newSignal === "DEATH" && prevSignal === "GOLDEN") {
+        deathCrossTickers.push(createStockInfo(symbol, name, currentPrice, sma50, sma200, currency));
         row[7] = now; // Update timestamp for display in email
-        if (DEBUG_MODE) Logger.log("→ DEATH CROSS detected for " + symbol);
+        if (CONFIG.DEBUG_MODE) Logger.log(`→ DEATH CROSS detected for ${symbol}`);
       }
 
       // Collect data for batch updates
@@ -112,18 +96,14 @@ function checkForSignals() {
 
     // Always log summary information (not too verbose)
     Logger.log(
-      "Detected: " +
-        goldenCrossTickers.length +
-        " Golden Cross and " +
-        deathCrossTickers.length +
-        " Death Cross signals",
+      `Detected: ${goldenCrossTickers.length} Golden Cross and ${deathCrossTickers.length} Death Cross signals`
     );
 
     // Send email if there are any changes
     if (goldenCrossTickers.length > 0 || deathCrossTickers.length > 0) {
       sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, {
         date: now,
-        debug: DEBUG_MODE,
+        debug: CONFIG.DEBUG_MODE,
         executionTime: new Date().getTime() - startTime,
       });
       Logger.log("Email sent successfully");
@@ -133,20 +113,40 @@ function checkForSignals() {
 
     // Always log total execution time (useful performance metric)
     Logger.log(
-      "Execution completed in " + (new Date().getTime() - startTime) + "ms",
+      `Execution completed in ${new Date().getTime() - startTime}ms`
     );
   } catch (error) {
     MailApp.sendEmail({
-      to: "matthias.gronwald@gmail.com",
+      to: CONFIG.EMAIL_RECIPIENT,
       subject: "Error in SMA Cross Signals Script",
-      body:
-        "An error occurred: " +
-        error.toString() +
-        "\n\nStack trace: " +
-        error.stack,
+      body: `An error occurred: ${error.toString()}\n\nStack trace: ${error.stack}`
     });
-    Logger.log("ERROR: " + error);
+    Logger.log(`ERROR: ${error}`);
   }
+}
+
+/**
+ * Creates a stock info object with calculated percentages
+ * 
+ * @param {string} symbol - Stock ticker symbol
+ * @param {string} name - Company name
+ * @param {number} price - Current price
+ * @param {number} sma50 - 50-day SMA
+ * @param {number} sma200 - 200-day SMA
+ * @param {string} currency - Currency symbol
+ * @return {Object} Formatted stock information
+ */
+function createStockInfo(symbol, name, price, sma50, sma200, currency) {
+  return {
+    symbol: symbol,
+    name: name,
+    price: price,
+    sma50: sma50,
+    sma200: sma200,
+    pctAbove50: ((price / sma50 - 1) * 100).toFixed(2),
+    pctAbove200: ((price / sma200 - 1) * 100).toFixed(2),
+    currency: currency || "" // Include currency, default to empty string if not available
+  };
 }
 
 /**
@@ -157,17 +157,31 @@ function checkForSignals() {
  * @param {Object} options - Additional options like date and debug info
  */
 function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
-  var htmlBody = generateCrossSignalHtml(
+  const htmlBody = generateCrossSignalHtml(
     goldenCrossTickers,
     deathCrossTickers,
-    options,
+    options
   );
-
-  MailApp.sendEmail({
-    to: "matthias.gronwald@gmail.com",
-    subject: "Golden Cross & Death Cross Signals",
-    htmlBody: htmlBody,
-  });
+  
+  try {
+    MailApp.sendEmail({
+      to: CONFIG.EMAIL_RECIPIENT,
+      subject: `Golden Cross & Death Cross Signals - ${options.date.toLocaleDateString("en-US")}`,
+      htmlBody: htmlBody,
+    });
+  } catch (error) {
+    Logger.log(`Failed to send email: ${error.toString()}`);
+    // Try a simpler email as fallback
+    try {
+      MailApp.sendEmail({
+        to: CONFIG.EMAIL_RECIPIENT,
+        subject: "Trading Signals Detected (Simplified Email)",
+        body: `Golden Cross signals: ${goldenCrossTickers.length}\nDeath Cross signals: ${deathCrossTickers.length}\n\nError sending formatted email: ${error.toString()}`
+      });
+    } catch (fallbackError) {
+      Logger.log(`Failed to send fallback email: ${fallbackError.toString()}`);
+    }
+  }
 }
 
 /**
@@ -181,17 +195,23 @@ function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
 function generateCrossSignalHtml(
   goldenCrossTickers,
   deathCrossTickers,
-  options,
+  options
 ) {
-  var now = options.date || new Date();
-  var htmlParts = [];
+  const now = options.date || new Date();
+  const htmlParts = [];
 
-  // Start HTML document
+  // Start HTML document with responsive design
   htmlParts.push(
-    '<!DOCTYPE html><html><body style="font-family: Arial, sans-serif;">',
+    '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' +
+    '<body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">',
   );
   htmlParts.push(
-    "<h2>SMA Cross Signals for " + now.toLocaleDateString("en-US") + "</h2>",
+    `<h2>SMA Cross Signals for ${now.toLocaleDateString("en-US")}</h2>`,
+  );
+  
+  // Add summary section
+  htmlParts.push(
+    `<p><b>Summary:</b> Found ${goldenCrossTickers.length} buy signals and ${deathCrossTickers.length} sell signals.</p>`
   );
 
   // Build Golden Cross table
@@ -220,7 +240,7 @@ function generateCrossSignalHtml(
   // Only include execution time in debug mode
   if (options.debug && options.executionTime) {
     htmlParts.push(
-      "<p><i>Execution time: " + options.executionTime + "ms</i></p>",
+      `<p><i>Execution time: ${options.executionTime}ms</i></p>`,
     );
   }
 
@@ -238,16 +258,16 @@ function generateCrossSignalHtml(
  * @return {string} The formatted HTML table
  */
 function generateCrossTable(tickers, options) {
-  var htmlParts = [];
+  const htmlParts = [];
 
   // Table header
   htmlParts.push(
-    "<h3>" + options.title + " " + options.subtitle + "</h3>",
-    '<table border="0" cellpadding="5" style="border-collapse: collapse;">',
+    `<h3>${options.title} ${options.subtitle}</h3>`,
+    '<table border="0" cellpadding="5" style="border-collapse: collapse; width: 100%; max-width: 800px;">',
     '<tr style="background-color: #f2f2f2;">',
     '<th align="left">Symbol</th>',
     '<th align="left">Name</th>',
-    '<th align="right">Current Price</th>',
+    '<th align="right">Price</th>',
     '<th align="center">Currency</th>', // Added currency column
     '<th align="right">50 SMA</th>',
     '<th align="right">200 SMA</th>',
@@ -256,23 +276,33 @@ function generateCrossTable(tickers, options) {
     "</tr>",
   );
 
-  // Table rows
-  for (var i = 0; i < tickers.length; i++) {
-    var stock = tickers[i];
+  // Table rows with improved formatting and color indicators
+  for (let i = 0; i < tickers.length; i++) {
+    const stock = tickers[i];
+    const pct50Color = parseFloat(stock.pctAbove50) >= 0 ? "green" : "red";
+    const pct200Color = parseFloat(stock.pctAbove200) >= 0 ? "green" : "red";
+    
     htmlParts.push(
-      "<tr" + (i % 2 == 1 ? ' style="background-color: #f9f9f9;"' : "") + ">",
-      "<td><b>" + stock.symbol + "</b></td>",
-      "<td>" + stock.name + "</td>",
-      '<td align="right"><b>' + stock.price.toFixed(2) + "</b></td>",
-      '<td align="center">' + stock.currency + "</td>", // Display currency
-      '<td align="right">' + stock.sma50.toFixed(2) + "</td>",
-      '<td align="right">' + stock.sma200.toFixed(2) + "</td>",
-      '<td align="right">' + stock.pctAbove50 + "%</td>",
-      '<td align="right">' + stock.pctAbove200 + "%</td>",
+      `<tr${i % 2 === 1 ? ' style="background-color: #f9f9f9;"' : ""}>`,
+      `<td><b>${stock.symbol}</b></td>`,
+      `<td>${stock.name}</td>`,
+      `<td align="right"><b>${stock.price.toFixed(2)}</b></td>`,
+      `<td align="center">${stock.currency}</td>`, // Display currency
+      `<td align="right">${stock.sma50.toFixed(2)}</td>`,
+      `<td align="right">${stock.sma200.toFixed(2)}</td>`,
+      `<td align="right" style="color: ${pct50Color}">${stock.pctAbove50}%</td>`,
+      `<td align="right" style="color: ${pct200Color}">${stock.pctAbove200}%</td>`,
       "</tr>",
     );
   }
 
   htmlParts.push("</table><br>");
   return htmlParts.join("");
+}
+
+/**
+ * Trigger function that can be scheduled to run hourly
+ */
+function hourlySignalCheck() {
+  checkForSignals();
 }
