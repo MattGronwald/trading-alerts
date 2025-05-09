@@ -4,7 +4,7 @@
 const CONFIG = {
   DEBUG_MODE: false,
   SHEET_NAME: "Aktienliste",
-  EMAIL_RECIPIENT: "matthias.gronwald@gmail.com"
+  EMAIL_RECIPIENT: "your-email@example.com",
 };
 
 /**
@@ -46,7 +46,7 @@ function checkForSignals() {
       const sma200 = row[4];
       const prevSignal = row[6]; // Previous Signal (column 7)
       const currency = row[8]; // Currency (column I)
-      
+
       // Skip processing if we have invalid data
       if (!symbol || !currentPrice || !sma50 || !sma200) {
         continue;
@@ -58,21 +58,27 @@ function checkForSignals() {
       // Debug logging
       if (CONFIG.DEBUG_MODE) {
         Logger.log(
-          `Row ${i + 2}: ${symbol}, New Signal=${newSignal}, Prev Signal=${prevSignal}, 50 SMA=${sma50}, 200 SMA=${sma200}, Currency=${currency}`
+          `Row ${i + 2}: ${symbol}, New Signal=${newSignal}, Prev Signal=${prevSignal}, 50 SMA=${sma50}, 200 SMA=${sma200}, Currency=${currency}`,
         );
       }
 
       // Check for a Golden Cross (was DEATH, now GOLDEN)
       if (newSignal === "GOLDEN" && prevSignal === "DEATH") {
-        goldenCrossTickers.push(createStockInfo(symbol, name, currentPrice, sma50, sma200, currency));
+        goldenCrossTickers.push(
+          createStockInfo(symbol, name, currentPrice, sma50, sma200, currency),
+        );
         row[7] = now; // Update timestamp for display in email
-        if (CONFIG.DEBUG_MODE) Logger.log(`→ GOLDEN CROSS detected for ${symbol}`);
+        if (CONFIG.DEBUG_MODE)
+          Logger.log(`→ GOLDEN CROSS detected for ${symbol}`);
       }
       // Check for a Death Cross (was GOLDEN, now DEATH)
       else if (newSignal === "DEATH" && prevSignal === "GOLDEN") {
-        deathCrossTickers.push(createStockInfo(symbol, name, currentPrice, sma50, sma200, currency));
+        deathCrossTickers.push(
+          createStockInfo(symbol, name, currentPrice, sma50, sma200, currency),
+        );
         row[7] = now; // Update timestamp for display in email
-        if (CONFIG.DEBUG_MODE) Logger.log(`→ DEATH CROSS detected for ${symbol}`);
+        if (CONFIG.DEBUG_MODE)
+          Logger.log(`→ DEATH CROSS detected for ${symbol}`);
       }
 
       // Collect data for batch updates
@@ -96,7 +102,7 @@ function checkForSignals() {
 
     // Always log summary information (not too verbose)
     Logger.log(
-      `Detected: ${goldenCrossTickers.length} Golden Cross and ${deathCrossTickers.length} Death Cross signals`
+      `Detected: ${goldenCrossTickers.length} Golden Cross and ${deathCrossTickers.length} Death Cross signals`,
     );
 
     // Send email if there are any changes
@@ -112,14 +118,12 @@ function checkForSignals() {
     }
 
     // Always log total execution time (useful performance metric)
-    Logger.log(
-      `Execution completed in ${new Date().getTime() - startTime}ms`
-    );
+    Logger.log(`Execution completed in ${new Date().getTime() - startTime}ms`);
   } catch (error) {
     MailApp.sendEmail({
       to: CONFIG.EMAIL_RECIPIENT,
       subject: "Error in SMA Cross Signals Script",
-      body: `An error occurred: ${error.toString()}\n\nStack trace: ${error.stack}`
+      body: `An error occurred: ${error.toString()}\n\nStack trace: ${error.stack}`,
     });
     Logger.log(`ERROR: ${error}`);
   }
@@ -127,7 +131,7 @@ function checkForSignals() {
 
 /**
  * Creates a stock info object with calculated percentages
- * 
+ *
  * @param {string} symbol - Stock ticker symbol
  * @param {string} name - Company name
  * @param {number} price - Current price
@@ -145,7 +149,7 @@ function createStockInfo(symbol, name, price, sma50, sma200, currency) {
     sma200: sma200,
     pctAbove50: ((price / sma50 - 1) * 100).toFixed(2),
     pctAbove200: ((price / sma200 - 1) * 100).toFixed(2),
-    currency: currency || "" // Include currency, default to empty string if not available
+    currency: currency || "", // Include currency, default to empty string if not available
   };
 }
 
@@ -160,9 +164,9 @@ function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
   const htmlBody = generateCrossSignalHtml(
     goldenCrossTickers,
     deathCrossTickers,
-    options
+    options,
   );
-  
+
   try {
     MailApp.sendEmail({
       to: CONFIG.EMAIL_RECIPIENT,
@@ -176,7 +180,7 @@ function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
       MailApp.sendEmail({
         to: CONFIG.EMAIL_RECIPIENT,
         subject: "Trading Signals Detected (Simplified Email)",
-        body: `Golden Cross signals: ${goldenCrossTickers.length}\nDeath Cross signals: ${deathCrossTickers.length}\n\nError sending formatted email: ${error.toString()}`
+        body: `Golden Cross signals: ${goldenCrossTickers.length}\nDeath Cross signals: ${deathCrossTickers.length}\n\nError sending formatted email: ${error.toString()}`,
       });
     } catch (fallbackError) {
       Logger.log(`Failed to send fallback email: ${fallbackError.toString()}`);
@@ -195,7 +199,7 @@ function sendCrossSignalEmail(goldenCrossTickers, deathCrossTickers, options) {
 function generateCrossSignalHtml(
   goldenCrossTickers,
   deathCrossTickers,
-  options
+  options,
 ) {
   const now = options.date || new Date();
   const htmlParts = [];
@@ -203,15 +207,15 @@ function generateCrossSignalHtml(
   // Start HTML document with responsive design
   htmlParts.push(
     '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' +
-    '<body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">',
+      '<body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">',
   );
   htmlParts.push(
     `<h2>SMA Cross Signals for ${now.toLocaleDateString("en-US")}</h2>`,
   );
-  
+
   // Add summary section
   htmlParts.push(
-    `<p><b>Summary:</b> Found ${goldenCrossTickers.length} buy signals and ${deathCrossTickers.length} sell signals.</p>`
+    `<p><b>Summary:</b> Found ${goldenCrossTickers.length} buy signals and ${deathCrossTickers.length} sell signals.</p>`,
   );
 
   // Build Golden Cross table
@@ -239,9 +243,7 @@ function generateCrossSignalHtml(
 
   // Only include execution time in debug mode
   if (options.debug && options.executionTime) {
-    htmlParts.push(
-      `<p><i>Execution time: ${options.executionTime}ms</i></p>`,
-    );
+    htmlParts.push(`<p><i>Execution time: ${options.executionTime}ms</i></p>`);
   }
 
   htmlParts.push("</body></html>");
@@ -281,7 +283,7 @@ function generateCrossTable(tickers, options) {
     const stock = tickers[i];
     const pct50Color = parseFloat(stock.pctAbove50) >= 0 ? "green" : "red";
     const pct200Color = parseFloat(stock.pctAbove200) >= 0 ? "green" : "red";
-    
+
     htmlParts.push(
       `<tr${i % 2 === 1 ? ' style="background-color: #f9f9f9;"' : ""}>`,
       `<td><b>${stock.symbol}</b></td>`,
